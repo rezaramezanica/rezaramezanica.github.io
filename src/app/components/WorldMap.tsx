@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   ComposableMap,
   Geographies,
@@ -7,7 +7,7 @@ import {
   ZoomableGroup,
 } from "react-simple-maps";
 import { geoMercator } from "d3-geo";
-import { Factory, MapPin, Package } from "lucide-react";
+import { Factory, MapPin } from "lucide-react";
 
 const geoUrl = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
@@ -117,8 +117,8 @@ const routes: Route[] = [
   { id: "r-il-jp", fromNodeId: "factory-israel", toNodeId: "customer-japan", volume: "low", label: "Containers" },
   { id: "r-il-kr", fromNodeId: "factory-israel", toNodeId: "customer-korea", volume: "low", label: "Containers" },
   { id: "r-il-my", fromNodeId: "factory-israel", toNodeId: "customer-malaysia", volume: "low", label: "Containers" },
-  { id: "r-il-us", fromNodeId: "factory-israel", toNodeId: "customer-us", volume: "medium", label: "Containers" },
-  { id: "r-il-eu", fromNodeId: "factory-israel", toNodeId: "customer-eu", volume: "high", label: "Containers" },
+  { id: "r-il-us", fromNodeId: "factory-israel", toNodeId: "customer-us", volume: "low", label: "Containers" },
+  { id: "r-il-eu", fromNodeId: "factory-israel", toNodeId: "customer-eu", volume: "low", label: "Containers" },
 
   // China → Asia customers only
   { id: "r-cn-tw", fromNodeId: "factory-china", toNodeId: "customer-taiwan", volume: "high", label: "Containers" },
@@ -131,8 +131,8 @@ const routes: Route[] = [
   { id: "r-sg-jp", fromNodeId: "factory-singapore", toNodeId: "customer-japan", volume: "medium", label: "Planned containers" },
   { id: "r-sg-kr", fromNodeId: "factory-singapore", toNodeId: "customer-korea", volume: "high", label: "Planned containers" },
   { id: "r-sg-my", fromNodeId: "factory-singapore", toNodeId: "customer-malaysia", volume: "high", label: "Planned containers" },
-  { id: "r-sg-us", fromNodeId: "factory-singapore", toNodeId: "customer-us", volume: "medium", label: "Planned containers" },
-  { id: "r-sg-eu", fromNodeId: "factory-singapore", toNodeId: "customer-eu", volume: "medium", label: "Planned containers" },
+  { id: "r-sg-us", fromNodeId: "factory-singapore", toNodeId: "customer-us", volume: "low", label: "Planned containers" },
+  { id: "r-sg-eu", fromNodeId: "factory-singapore", toNodeId: "customer-eu", volume: "low", label: "Planned containers" },
 ];
 
 function volumeToStyle(volume: Route["volume"]) {
@@ -162,14 +162,8 @@ function arcPath(start: [number, number], end: [number, number], curvature: numb
 }
 
 export function WorldMap() {
-  const [selectedNode, setSelectedNode] = useState<Node | null>(null);
-  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
-  const [showSingaporePlannedFactory, setShowSingaporePlannedFactory] = useState(true);
-
-  const handleMarkerClick = (node: Node, event: React.MouseEvent) => {
-    setSelectedNode(node);
-    setTooltipPos({ x: event.clientX, y: event.clientY });
-  };
+  const [showChina, setShowChina] = useState(false);
+  const [showSingapore, setShowSingapore] = useState(false);
 
   const mapSize = { width: 980, height: 520 };
 
@@ -189,25 +183,24 @@ export function WorldMap() {
 
   const visibleNodes = useMemo(
     () =>
-      showSingaporePlannedFactory
-        ? nodes
-        : nodes.filter((node) => node.id !== "factory-singapore"),
-    [showSingaporePlannedFactory]
+      nodes.filter((node) => {
+        if (node.id === "factory-china") return showChina;
+        if (node.id === "factory-singapore") return showSingapore;
+        return true;
+      }),
+    [showChina, showSingapore]
   );
 
   const visibleRoutes = useMemo(
     () =>
-      showSingaporePlannedFactory
-        ? routes
-        : routes.filter((route) => route.fromNodeId !== "factory-singapore"),
-    [showSingaporePlannedFactory]
+      routes.filter((route) => {
+        if (route.fromNodeId === "factory-china") return showChina;
+        if (route.fromNodeId === "factory-singapore") return showSingapore;
+        return true;
+      }),
+    [showChina, showSingapore]
   );
 
-  useEffect(() => {
-    if (!showSingaporePlannedFactory && selectedNode?.id === "factory-singapore") {
-      setSelectedNode(null);
-    }
-  }, [showSingaporePlannedFactory, selectedNode]);
 
   return (
     <div className="relative w-full h-full">
@@ -329,8 +322,6 @@ export function WorldMap() {
             <Marker
               key={node.id}
               coordinates={node.coordinates}
-              onClick={(event: any) => handleMarkerClick(node, event)}
-              style={{ cursor: "pointer" }}
             >
               {node.kind === "factory_current" ? (
                 <>
@@ -359,92 +350,20 @@ export function WorldMap() {
         </ZoomableGroup>
       </ComposableMap>
 
-      {/* Info Panel */}
-      {selectedNode && (
-        <div className="absolute top-4 right-4 bg-white rounded-lg shadow-xl p-6 max-w-md border border-gray-200">
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex items-center gap-2">
-              {selectedNode.kind === "factory_current" ? (
-                <Factory className="text-blue-600" size={24} />
-              ) : selectedNode.kind === "factory_planned" ? (
-                <Factory className="text-amber-600" size={24} />
-              ) : (
-                <MapPin className="text-red-600" size={24} />
-              )}
-              <h3 className="font-semibold text-lg">{selectedNode.name}</h3>
-            </div>
-            <button
-              onClick={() => setSelectedNode(null)}
-              className="text-gray-400 hover:text-gray-600"
-            >
-              ✕
-            </button>
-          </div>
-
-          <div className="space-y-3 text-sm">
-            {selectedNode.details &&
-              Object.entries(selectedNode.details).map(([k, v]) => (
-                <div key={k}>
-                  <span className="font-medium text-gray-700">{k[0]!.toUpperCase() + k.slice(1)}:</span>
-                  <p className="text-gray-600">{v}</p>
-                </div>
-              ))}
-
-            {selectedNode.kind !== "customer" && (
-              <div className="pt-2">
-                <span className="font-medium text-gray-700">Shipping to:</span>
-                <div className="mt-1 grid grid-cols-2 gap-1 text-gray-600">
-                  {visibleRoutes
-                    .filter((r) => r.fromNodeId === selectedNode.id)
-                    .map((r) => {
-                      const to = nodeById.get(r.toNodeId);
-                      return <div key={r.id}>{to?.name.replace("Customers — ", "")}</div>;
-                    })}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      <div className="absolute top-4 left-4 bg-white rounded-lg shadow-lg p-3 border border-gray-200">
+      {/* Factory toggles */}
+      <div className="absolute -translate-x-1/2 -translate-y-1/2 flex gap-1.5 z-10" style={{ left: "40%", top: "46%" }}>
         <button
-          onClick={() => setShowSingaporePlannedFactory((prev) => !prev)}
-          className="px-3 py-2 text-xs font-medium rounded-md border border-gray-300 hover:bg-gray-50"
-        >
-          {showSingaporePlannedFactory ? "Disable Planned Factory (Singapore)" : "Enable Planned Factory (Singapore)"}
-        </button>
-      </div>
-
-      {/* Legend */}
-      <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg p-4 border border-gray-200">
-        <h4 className="font-semibold text-sm mb-3">Legend</h4>
-        <div className="space-y-2 text-xs">
-          <div className="flex items-center gap-2">
-            <Factory className="text-blue-600" size={16} />
-            <span>Current Factories (Israel, China)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Factory className="text-amber-600" size={16} />
-            <span>Planned Factory (Singapore)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <MapPin className="text-red-600" size={16} />
-            <span>Customer Regions (Asia / US / Europe)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-[2px] bg-blue-600 opacity-70"></div>
-            <span>Active container routes</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-[2px] bg-amber-600 opacity-70" style={{ borderTop: "2px dashed currentColor" }}></div>
-            <span>Planned container routes</span>
-          </div>
-          <div className="flex items-center gap-2 pt-1 text-[11px] text-gray-500">
-            <Package size={14} className="text-gray-500" />
-            <span>Routes show container shipping from factories to customers</span>
-          </div>
-        </div>
+          onClick={() => setShowChina((prev) => !prev)}
+          className="w-6 h-6 rounded-full text-[10px] font-bold cursor-pointer border border-white/20 bg-white/10 text-white/30"
+          title={showChina ? "Hide China factory" : "Show China factory"}
+          aria-label="Toggle China factory"
+        >C</button>
+        <button
+          onClick={() => setShowSingapore((prev) => !prev)}
+          className="w-6 h-6 rounded-full text-[10px] font-bold cursor-pointer border border-white/20 bg-white/10 text-white/30"
+          title={showSingapore ? "Hide Singapore factory" : "Show Singapore factory"}
+          aria-label="Toggle Singapore factory"
+        >S</button>
       </div>
     </div>
   );
